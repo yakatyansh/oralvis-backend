@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -15,6 +16,14 @@ app.use(cors());
 app.get("/", (req, res) => {
   res.send("API is running 🚀");
 });
+
+app.use("/auth", authRoutes);
+
+app.post("/ping", (req, res) => {
+  res.json({ message: "pong", body: req.body });
+});
+
+
 
 
 mongoose

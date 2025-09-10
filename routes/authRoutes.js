@@ -1,19 +1,11 @@
-const express = require('express');
+import express from 'express';
+import { register} from '../controllers/authController.js';
+
 
 const router = express.Router();
 
+router.post('/register',register)
+// router.post('/login',loginUser)
+// router.post('/logout',logoutUser)
 
-router.post('/register', (req, res) => {
-    res.send('Register endpoint');
-});
-
-
-router.post('/login', (req, res) => {
-    res.send('Login endpoint');
-});
-router.post('/logout', (req, res) => {
-
-    res.send('Logout endpoint');
-});
-
-module.exports = router;
+export default router;
