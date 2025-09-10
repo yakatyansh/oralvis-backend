@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from "../models/User.js";
+import jwt from 'jsonwebtoken';
+import e from 'express';
 
 
 export const register = async (req, res) => {
@@ -51,3 +53,43 @@ export const register = async (req, res) => {
   }
 };
     
+
+export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+        
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+        
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+          const safeUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
+    return res.json({ message: "Login successful", token, user: safeUser });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const logout = async (req, res) => {
+   return res.json({ message: "Logged out" });
+};  

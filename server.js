@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
+import submissionRoutes from "./routes/submissionRoutes.js";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/submissions", submissionRoutes);
 
 app.post("/ping", (req, res) => {
   res.json({ message: "pong", body: req.body });
