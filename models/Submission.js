@@ -1,31 +1,55 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
 
-const submissionSchema = new mongoose.Schema(
-  {
-    patient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    imageUrl: {
-      type: String, 
-      required: true,
-    },
-    annotatedImageUrl: {
-      type: String, 
-    },
-    reportUrl: {
-      type: String,
-    },
-    status: {
-      type: String,
-      enum: ["pending", "reviewed"],
-      default: "pending",
-    },
+const submissionSchema = new mongoose.Schema({
+  patient: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  { timestamps: true }
-);
+  patientName: {
+    type: String,
+    required: true
+  },
+  patientId: {
+    type: String,
+    required: true
+  },
+  email: {
+    type: String,
+    required: true
+  },
+  note: {
+    type: String,
+    default: ''
+  },
+  originalImageUrl: {
+    type: String,
+    required: true
+  },
+  originalImageKey: String, // For S3
+  annotatedImageUrl: String,
+  annotatedImageKey: String, // For S3
+  annotationData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  reportUrl: String,
+  reportKey: String, // For S3
+  status: {
+    type: String,
+    enum: ['uploaded', 'annotated', 'reported'],
+    default: 'uploaded'
+  },
+  adminNotes: {
+    type: String,
+    default: ''
+  },
+  processedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
+}, {
+  timestamps: true
+});
 
-const Submission = mongoose.model("Submission", submissionSchema);
-
-export default Submission;
+module.exports = mongoose.model('Submission', submissionSchema);
