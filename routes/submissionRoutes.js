@@ -5,7 +5,7 @@ const { upload, useS3 } = require('../middleware/upload');
 
 const router = express.Router();
 
-// Upload submission
+
 router.post('/upload', auth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -52,7 +52,6 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
   }
 });
 
-// Get user's submissions
 router.get('/my-submissions', auth, async (req, res) => {
   try {
     const submissions = await Submission.find({ patient: req.user._id })
@@ -66,7 +65,6 @@ router.get('/my-submissions', auth, async (req, res) => {
   }
 });
 
-// Download report
 router.get('/:id/report', auth, async (req, res) => {
   try {
     const submission = await Submission.findById(req.params.id);
@@ -75,7 +73,6 @@ router.get('/:id/report', auth, async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    // Check if user owns this submission or is admin
     if (submission.patient.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
