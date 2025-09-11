@@ -21,6 +21,7 @@ app.get("/", (req, res) => {
 app.use("/auth", authRoutes);
 app.use("/submissions", submissionRoutes);
 
+
 app.post("/ping", (req, res) => {
   res.json({ message: "pong", body: req.body });
 });
