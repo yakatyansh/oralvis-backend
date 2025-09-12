@@ -1,5 +1,5 @@
 const express = require('express');
-const Submission = require('../models/Submission');
+const Submission = require('../models/submission');
 const { auth, adminAuth } = require('../middleware/auth');
 const { upload } = require('../middleware/uploadMiddleware');
 const PDFGenerator = require('../services/pdfGen');
