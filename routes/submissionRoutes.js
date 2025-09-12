@@ -1,6 +1,6 @@
 const express = require('express');
 const Submission = require('../models/submission');
-const { auth } = require('../middleware/auth');
+const { auth } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
