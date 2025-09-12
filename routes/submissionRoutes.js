@@ -1,10 +1,9 @@
 const express = require('express');
 const Submission = require('../models/submission');
 const { auth } = require('../middleware/auth');
-const { upload, useS3 } = require('../middleware/upload');
+const { upload } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
-
 
 router.post('/upload', auth, upload.single('image'), async (req, res) => {
   try {
@@ -14,13 +13,11 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
 
     const { patientName, patientId, email, note } = req.body;
 
-    // Validate required fields
     if (!patientName || !patientId || !email) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const imageUrl = useS3 ? req.file.location : `/uploads/${req.file.filename}`;
-    const imageKey = useS3 ? req.file.key : undefined;
+    const imageUrl = `/uploads/${req.file.filename}`;
 
     const submission = new Submission({
       patient: req.user._id,
@@ -29,7 +26,6 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
       email,
       note: note || '',
       originalImageUrl: imageUrl,
-      originalImageKey: imageKey,
       status: 'uploaded'
     });
 

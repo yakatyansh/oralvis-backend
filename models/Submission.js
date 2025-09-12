@@ -26,15 +26,12 @@ const submissionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  originalImageKey: String, // For S3
   annotatedImageUrl: String,
-  annotatedImageKey: String, // For S3
   annotationData: {
     type: mongoose.Schema.Types.Mixed,
     default: null
   },
   reportUrl: String,
-  reportKey: String, // For S3
   status: {
     type: String,
     enum: ['uploaded', 'annotated', 'reported'],
