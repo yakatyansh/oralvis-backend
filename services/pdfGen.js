@@ -2,15 +2,26 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+const ANNOTATION_LEGEND = {
+    rectangle: { label: 'Stains', color: '#EF4444' }, 
+    square: { label: 'Malaligned', color: '#22C55E' }, 
+    circle: { label: 'Attrition', color: '#3B82F6' }, 
+};
+
+const TREATMENT_RECOMMENDATIONS = {
+    Stains: "Teeth cleaning and polishing is recommended to remove surface stains.",
+    Malaligned: "Braces or Clear Aligners can be considered for teeth alignment.",
+    Attrition: "A filling or a night guard may be necessary to prevent further wear.",
+};
+
 class PDFGenerator {
   static async generateReport(submission) {
-    const doc = new PDFDocument({ margin: 50, layout: 'portrait', size: 'A4' });
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+      const buffers = [];
 
-    const buffers = [];
-    doc.on('data', buffers.push.bind(buffers));
-
-    return new Promise(async (resolve, reject) => {
-      doc.on('end', async () => {
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
         try {
           const pdfBuffer = Buffer.concat(buffers);
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -23,74 +34,67 @@ class PDFGenerator {
           reject(error);
         }
       });
+      
+      // --- PDF Content ---
+      
+      // Header Section
+      doc.fontSize(16).font('Helvetica-Bold').text('Oral Health Screening Report', { align: 'left' });
+      doc.fontSize(10).font('Helvetica').text(`Patient: ${submission.patientName}`, { align: 'left' });
+      doc.text(`Report Date: ${new Date().toLocaleDateString()}`, { align: 'left' });
+      doc.moveDown(2);
 
-      try {
-        // --- PDF Content ---
-        doc.fontSize(20).font('Helvetica-Bold').text('OralVis Healthcare', { align: 'center' });
-        doc.moveDown();
-        doc.fontSize(16).text('Dental Analysis Report', { align: 'center' });
-        doc.moveDown(2);
+      // Screening Report Title
+      doc.fontSize(12).font('Helvetica-Bold').text('SCREENING REPORT:', { align: 'left' });
+      doc.moveDown(1);
 
-        // --- Patient Info ---
-        doc.fontSize(14).font('Helvetica-Bold').text('Patient Information');
-        doc.fontSize(12).font('Helvetica');
-        doc.text(`Name: ${submission.patientName}`);
-        doc.text(`Patient ID: ${submission.patientId}`);
-        doc.text(`Upload Date: ${new Date(submission.createdAt).toLocaleDateString()}`);
-        doc.moveDown(2);
-
-        // --- Images ---
-        doc.fontSize(14).font('Helvetica-Bold').text('Submitted Images');
-        
-        const imageWidth = 250; // Width for each image
-        const startX = doc.page.margins.left;
-        
-        // Loop through original and annotated images
-        submission.originalImageUrls.forEach((imageUrl, index) => {
-          const annotatedUrl = submission.annotatedImageUrls[index];
-
-          // Add a new page if there's not enough space
-          if (doc.y > 600) {
-            doc.addPage();
-          }
-          
-          doc.fontSize(12).font('Helvetica-Bold').text(`Image ${index + 1}`, { underline: true });
-          doc.moveDown();
-
-          // Draw original image
-          const originalImagePath = path.join(__dirname, '..', imageUrl);
-          if (fs.existsSync(originalImagePath)) {
-            doc.image(originalImagePath, startX, doc.y, { width: imageWidth });
-          }
-
-          // Draw annotated image side-by-side
-          if (annotatedUrl) {
-            const annotatedImagePath = path.join(__dirname, '..', annotatedUrl);
-            if (fs.existsSync(annotatedImagePath)) {
-              doc.image(annotatedImagePath, startX + imageWidth + 20, doc.y, { width: imageWidth });
-            }
-          }
-          doc.moveDown(15); // Adjust spacing after images
-        });
-        
-        doc.addPage(); // New page for notes
-
-        // --- Notes ---
-        if (submission.note) {
-          doc.fontSize(14).font('Helvetica-Bold').text('Patient Notes');
-          doc.fontSize(12).font('Helvetica').text(submission.note, { width: 500 });
-          doc.moveDown(2);
+      // Image Grid
+      const imageSectionY = doc.y;
+      const imageWidth = 220;
+      const imageSpacing = 20;
+      const imageLabels = ['Upper Teeth', 'Front Teeth', 'Lower Teeth'];
+      
+      submission.annotatedImageUrls.slice(0, 3).forEach((url, index) => {
+        const imagePath = path.join(__dirname, '..', url);
+        const xPos = doc.page.margins.left + index * (imageWidth + imageSpacing);
+        if (fs.existsSync(imagePath)) {
+          doc.image(imagePath, xPos, imageSectionY, { width: imageWidth });
+          doc.fillColor('#c0392b').font('Helvetica-Bold').fontSize(12).text(imageLabels[index], xPos, imageSectionY + 150, { width: imageWidth, align: 'center' });
         }
+      });
+      
+      let bottomOfImages = imageSectionY + 180;
+      doc.y = bottomOfImages;
+      
+      // Legend Section
+      let legendX = doc.page.margins.left;
+      const legendY = doc.y;
+      const uniqueAnnotationTypes = [...new Set(submission.annotationData.flat().map((a) => a.type))];
 
-        if (submission.adminNotes) {
-          doc.fontSize(14).font('Helvetica-Bold').text('Professional Analysis');
-          doc.fontSize(12).font('Helvetica').text(submission.adminNotes, { width: 500 });
+      uniqueAnnotationTypes.forEach(type => {
+        const legendItem = ANNOTATION_LEGEND[type];
+        if (legendItem) {
+          doc.rect(legendX, legendY, 12, 12).fill(legendItem.color);
+          doc.fillColor('black').font('Helvetica').fontSize(10).text(legendItem.label, legendX + 20, legendY + 2);
+          legendX += (legendItem.label.length * 5) + 60; // Adjust spacing based on text length
         }
+      });
 
-        doc.end();
-      } catch (error) {
-        reject(error);
-      }
+      doc.moveDown(4);
+      
+      // Treatment Recommendations
+      doc.fontSize(12).font('Helvetica-Bold').text('TREATMENT RECOMMENDATIONS:', { align: 'left' });
+      doc.moveDown(1);
+      
+      uniqueAnnotationTypes.forEach(type => {
+        const legendItem = ANNOTATION_LEGEND[type];
+        if (legendItem && TREATMENT_RECOMMENDATIONS[legendItem.label]) {
+            doc.font('Helvetica-Bold').text(`- ${legendItem.label}:`, { continued: true });
+            doc.font('Helvetica').text(` ${TREATMENT_RECOMMENDATIONS[legendItem.label]}`);
+            doc.moveDown(0.5);
+        }
+      });
+
+      doc.end();
     });
   }
 }
