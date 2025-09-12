@@ -5,25 +5,25 @@ const { auth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Generate JWT Token
+
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   });
 };
 
-// Register
+
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, patientId } = req.body;
 
-    // Check if user exists
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create user
+
     const user = new User({
       name,
       email,
@@ -34,7 +34,7 @@ router.post('/register', async (req, res) => {
 
     await user.save();
 
-    // Generate token
+
     const token = generateToken(user._id);
 
     res.status(201).json({
@@ -54,24 +54,24 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Check password
+
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Generate token
+
     const token = generateToken(user._id);
 
     res.json({
@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current user
+
 router.get('/me', auth, async (req, res) => {
   res.json({
     user: {
@@ -104,7 +104,7 @@ router.get('/me', auth, async (req, res) => {
   });
 });
 
-// Logout (client-side token removal)
+
 router.post('/logout', (req, res) => {
   res.json({ message: 'Logout successful' });
 });

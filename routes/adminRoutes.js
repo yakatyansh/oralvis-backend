@@ -1,5 +1,5 @@
 const express = require('express');
-const Submission = require('../models/submission');
+const Submission = require('../models/Submission');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
 const PDFGenerator = require('../services/pdfGen');
 const sharp = require('sharp');
@@ -34,7 +34,7 @@ router.get('/submissions/:id', async (req, res) => {
   }
 });
 
-// *** FIX: This route is now corrected to properly save annotated images ***
+
 router.post('/submissions/:id/annotate', async (req, res) => {
   try {
     const { annotationData, annotatedImageDatas, adminNotes } = req.body;

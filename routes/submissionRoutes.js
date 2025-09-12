@@ -1,5 +1,5 @@
 const express = require('express');
-const Submission = require('../models/submission');
+const Submission = require('../models/Submission');
 const { auth } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
 

@@ -12,7 +12,7 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-// *** FIX: Apply CORS middleware before all routes, including static files ***
+
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true
