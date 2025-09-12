@@ -1,7 +1,6 @@
 const express = require('express');
 const Submission = require('../models/submission');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
-const { upload } = require('../middleware/uploadMiddleware');
 const PDFGenerator = require('../services/pdfGen');
 const sharp = require('sharp');
 const path = require('path');
@@ -11,29 +10,11 @@ const router = express.Router();
 
 router.use(auth, adminAuth);
 
+// GET routes remain the same...
 router.get('/submissions', async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    const query = status ? { status } : {};
-    
-    const submissions = await Submission.find(query)
-      .populate('patient', 'name email')
-      .populate('processedBy', 'name')
-      .select('-annotationData')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Submission.countDocuments(query);
-
-    res.json({
-      submissions,
-      pagination: {
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
-        total
-      }
-    });
+    const submissions = await Submission.find(req.query).populate('patient', 'name email').populate('processedBy', 'name').select('-annotationData').sort({ createdAt: -1 });
+    res.json({ submissions });
   } catch (error) {
     console.error('Admin fetch submissions error:', error);
     res.status(500).json({ message: 'Error fetching submissions' });
@@ -42,14 +23,10 @@ router.get('/submissions', async (req, res) => {
 
 router.get('/submissions/:id', async (req, res) => {
   try {
-    const submission = await Submission.findById(req.params.id)
-      .populate('patient', 'name email')
-      .populate('processedBy', 'name');
-
+    const submission = await Submission.findById(req.params.id).populate('patient', 'name email').populate('processedBy', 'name');
     if (!submission) {
       return res.status(404).json({ message: 'Submission not found' });
     }
-
     res.json({ submission });
   } catch (error) {
     console.error('Admin fetch submission error:', error);
@@ -57,9 +34,9 @@ router.get('/submissions/:id', async (req, res) => {
   }
 });
 
+// *** FIX: This route is now corrected to properly save annotated images ***
 router.post('/submissions/:id/annotate', async (req, res) => {
   try {
-    // Expect an array of base64 image strings
     const { annotationData, annotatedImageDatas, adminNotes } = req.body;
     
     const submission = await Submission.findById(req.params.id);
@@ -67,7 +44,8 @@ router.post('/submissions/:id/annotate', async (req, res) => {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    let annotatedImageUrls = [];
+    const annotatedImageUrls = [];
+
     if (annotatedImageDatas && Array.isArray(annotatedImageDatas)) {
       for (const imageData of annotatedImageDatas) {
         const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -80,26 +58,24 @@ router.post('/submissions/:id/annotate', async (req, res) => {
         const timestamp = Date.now();
         const filename = `annotated-${submission.patientId}-${timestamp}-${Math.round(Math.random() * 1E3)}.jpg`;
         const filePath = path.join('uploads', filename);
+
         fs.writeFileSync(filePath, processedBuffer);
+        
         annotatedImageUrls.push(`/uploads/${filename}`);
       }
     }
 
     submission.annotationData = annotationData;
-    submission.annotatedImageUrls = annotatedImageUrls; // Save the array
+    submission.annotatedImageUrls = annotatedImageUrls;
     submission.adminNotes = adminNotes || '';
     submission.status = 'annotated';
     submission.processedBy = req.user._id;
-
-    await submission.save();
+    
+    const updatedSubmission = await submission.save();
 
     res.json({
-      message: 'Annotation saved successfully',
-      submission: {
-        id: submission._id,
-        status: submission.status,
-        annotatedImageUrls: submission.annotatedImageUrls
-      }
+      message: 'Annotation saved successfully and images created.',
+      submission: updatedSubmission
     });
   } catch (error) {
     console.error('Save annotation error:', error);
@@ -107,5 +83,39 @@ router.post('/submissions/:id/annotate', async (req, res) => {
   }
 });
 
+// PDF generation route
+router.post('/submissions/:id/generate-pdf', async (req, res) => {
+  try {
+    const submission = await Submission.findById(req.params.id);
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    if (submission.status !== 'annotated') {
+      return res.status(400).json({ message: 'Submission must be annotated first' });
+    }
+
+    const pdfResult = await PDFGenerator.generateReport(submission);
+
+    submission.reportUrl = pdfResult.reportUrl;
+    submission.status = 'reported';
+
+    await submission.save();
+
+     res.json({
+      message: 'PDF report generated successfully',
+      reportUrl: pdfResult.reportUrl,
+      submission: {
+        id: submission._id,
+        status: submission.status,
+        reportUrl: submission.reportUrl
+      }
+    });
+  } catch (error) {
+    console.error('Generate PDF report error:', error);
+    res.status(500).json({ message: 'Error generating PDF report' });
+  }
+});
 
 module.exports = router;

@@ -2,14 +2,12 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
-// Define the mapping from annotation shapes to dental conditions and colors
 const ANNOTATION_LEGEND = {
-    rectangle: { label: 'Stains', color: '#EF4444' }, // Red
-    square: { label: 'Malaligned', color: '#22C55E' }, // Green
-    circle: { label: 'Attrition', color: '#3B82F6' }, // Blue
+    rectangle: { label: 'Stains', color: '#EF4444' },
+    square: { label: 'Malaligned', color: '#22C55E' },
+    circle: { label: 'Attrition', color: '#3B82F6' },
 };
 
-// Define the corresponding treatment recommendations
 const TREATMENT_RECOMMENDATIONS = {
     Stains: "Teeth cleaning and polishing is recommended to remove surface stains.",
     Malaligned: "Braces or Clear Aligners can be considered for teeth alignment.",
@@ -34,7 +32,6 @@ class PDFGenerator {
             const reportUrl = `/uploads/${filename}`;
             resolve({ reportUrl, filename });
           } catch (error) {
-            console.error("Error writing PDF file:", error);
             reject(error);
           }
         });
@@ -43,17 +40,14 @@ class PDFGenerator {
         doc.fontSize(18).font('Helvetica-Bold').text('Oral Health Screening Report', { align: 'center' });
         doc.moveDown(2);
 
-        // Patient Details
         doc.fontSize(11).font('Helvetica-Bold').text('Patient Name:', { continued: true }).font('Helvetica').text(` ${submission.patientName}`);
         doc.font('Helvetica-Bold').text('Patient ID:', { continued: true }).font('Helvetica').text(` ${submission.patientId}`);
         doc.font('Helvetica-Bold').text('Report Date:', { continued: true }).font('Helvetica').text(` ${new Date().toLocaleDateString()}`);
         doc.moveDown(2);
 
-        // Divider
         doc.strokeColor("#aaaaaa").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
         doc.moveDown(2);
 
-        // Image Grid
         doc.fontSize(14).font('Helvetica-Bold').text('SCREENING IMAGES', { align: 'left' });
         doc.moveDown(1);
         
@@ -62,18 +56,48 @@ class PDFGenerator {
         const imageLabels = ['Upper Teeth', 'Front Teeth', 'Lower Teeth'];
         const imageSectionY = doc.y;
 
-        submission.annotatedImageUrls.slice(0, 3).forEach((url, index) => {
-            const imagePath = path.join(__dirname, '..', url);
+        submission.originalImageUrls.slice(0, 3).forEach((url, index) => {
+            const imagePath = path.join(__dirname, '..', url.substring(1));
             const xPos = doc.page.margins.left + index * (imageWidth + imageSpacing);
+
             if (fs.existsSync(imagePath)) {
-                doc.image(imagePath, xPos, imageSectionY, { width: imageWidth });
-                doc.fillColor('#333333').font('Helvetica-Bold').fontSize(10).text(imageLabels[index], xPos, imageSectionY + 115, { width: imageWidth, align: 'center' });
+                const image = doc.openImage(imagePath);
+                const imageRatio = image.width / image.height;
+                const imageHeight = imageWidth / imageRatio;
+
+                doc.image(image, xPos, imageSectionY, { width: imageWidth });
+
+                // *** FIX: Draw annotations directly on the PDF ***
+                const annotations = submission.annotationData[index] || [];
+                annotations.forEach(anno => {
+                    const scaleFactor = imageWidth / image.width;
+                    doc.save();
+                    doc.lineWidth(anno.strokeWidth || 2).strokeColor(anno.stroke || '#000000');
+                    if (anno.type === 'rectangle' || anno.type === 'square') {
+                        doc.rect(
+                            xPos + (anno.x * scaleFactor),
+                            imageSectionY + (anno.y * scaleFactor),
+                            anno.width * scaleFactor,
+                            anno.height * scaleFactor
+                        ).stroke();
+                    } else if (anno.type === 'circle') {
+                        doc.circle(
+                            xPos + (anno.x * scaleFactor) + (anno.radius * scaleFactor),
+                            imageSectionY + (anno.y * scaleFactor) + (anno.radius * scaleFactor),
+                            anno.radius * scaleFactor
+                        ).stroke();
+                    }
+                    doc.restore();
+                });
+                
+                doc.fillColor('#333333').font('Helvetica-Bold').fontSize(10).text(imageLabels[index], xPos, imageSectionY + imageHeight + 5, { width: imageWidth, align: 'center' });
             }
         });
         
         doc.y = imageSectionY + 145;
 
-        // Legend
+        // ... (rest of the file remains the same) ...
+
         const uniqueAnnotationTypes = [...new Set((submission.annotationData || []).flat().map((a) => a.type))];
         if (uniqueAnnotationTypes.length > 0) {
             let legendX = doc.page.margins.left;
@@ -91,11 +115,9 @@ class PDFGenerator {
         }
         doc.moveDown(2);
 
-        // Divider
         doc.strokeColor("#aaaaaa").lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
         doc.moveDown(2);
         
-        // Treatment Recommendations
         doc.fontSize(14).font('Helvetica-Bold').text('TREATMENT RECOMMENDATIONS', { align: 'left' });
         doc.moveDown(1);
         

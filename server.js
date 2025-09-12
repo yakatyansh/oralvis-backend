@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path'); // Import the 'path' module
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -11,12 +12,13 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-
-app.use(helmet());
+// *** FIX: Apply CORS middleware before all routes, including static files ***
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+app.use(helmet());
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
@@ -28,9 +30,10 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/uploads', express.static('uploads'));
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/admin', adminRoutes);
@@ -43,7 +46,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Database connection
+
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
