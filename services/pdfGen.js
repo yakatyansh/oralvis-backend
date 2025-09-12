@@ -4,23 +4,20 @@ const path = require('path');
 
 class PDFGenerator {
   static async generateReport(submission) {
-    const doc = new PDFDocument({ margin: 50 });
-    
+    const doc = new PDFDocument({ margin: 50, layout: 'portrait', size: 'A4' });
+
     const buffers = [];
     doc.on('data', buffers.push.bind(buffers));
-    
+
     return new Promise(async (resolve, reject) => {
       doc.on('end', async () => {
         try {
           const pdfBuffer = Buffer.concat(buffers);
-          
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
           const filename = `report-${submission.patientId}-${timestamp}.pdf`;
-          
           const localPath = path.join('uploads', filename);
           fs.writeFileSync(localPath, pdfBuffer);
           const reportUrl = `/uploads/${filename}`;
-
           resolve({ reportUrl, filename });
         } catch (error) {
           reject(error);
@@ -28,57 +25,68 @@ class PDFGenerator {
       });
 
       try {
-        doc.fontSize(20).font('Helvetica-Bold').text('OralVis Healthcare', 50, 50);
-        doc.fontSize(16).text('Dental Analysis Report', 50, 80);
-        
-        doc.moveTo(50, 110).lineTo(550, 110).stroke();
-        
-        doc.fontSize(14).font('Helvetica-Bold').text('Patient Information', 50, 130);
+        // --- PDF Content ---
+        doc.fontSize(20).font('Helvetica-Bold').text('OralVis Healthcare', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(16).text('Dental Analysis Report', { align: 'center' });
+        doc.moveDown(2);
+
+        // --- Patient Info ---
+        doc.fontSize(14).font('Helvetica-Bold').text('Patient Information');
         doc.fontSize(12).font('Helvetica');
-        doc.text(`Name: ${submission.patientName}`, 50, 155);
-        doc.text(`Patient ID: ${submission.patientId}`, 50, 175);
-        doc.text(`Email: ${submission.email}`, 50, 195);
-        doc.text(`Upload Date: ${new Date(submission.createdAt).toLocaleDateString()}`, 50, 215);
-        doc.text(`Report Generated: ${new Date().toLocaleDateString()}`, 50, 235);
+        doc.text(`Name: ${submission.patientName}`);
+        doc.text(`Patient ID: ${submission.patientId}`);
+        doc.text(`Upload Date: ${new Date(submission.createdAt).toLocaleDateString()}`);
+        doc.moveDown(2);
+
+        // --- Images ---
+        doc.fontSize(14).font('Helvetica-Bold').text('Submitted Images');
         
-        if (submission.note) {
-          doc.fontSize(14).font('Helvetica-Bold').text('Patient Notes', 50, 265);
-          doc.fontSize(12).font('Helvetica').text(submission.note, 50, 285, { width: 500 });
-        }
+        const imageWidth = 250; // Width for each image
+        const startX = doc.page.margins.left;
         
-        let currentY = submission.note ? 320 : 270;
-        
-        doc.fontSize(14).font('Helvetica-Bold').text('Original Image', 50, currentY);
-        currentY += 25;
-        
-        if (fs.existsSync(submission.originalImageUrl.substring(1))) {
-            doc.image(submission.originalImageUrl.substring(1), 50, currentY, { width: 200, height: 150 });
-        }
-        
-        if (submission.annotatedImageUrl) {
-          doc.fontSize(14).font('Helvetica-Bold').text('Annotated Image', 300, currentY - 25);
-          if (fs.existsSync(submission.annotatedImageUrl.substring(1))) {
-            doc.image(submission.annotatedImageUrl.substring(1), 300, currentY, { width: 200, height: 150 });
+        // Loop through original and annotated images
+        submission.originalImageUrls.forEach((imageUrl, index) => {
+          const annotatedUrl = submission.annotatedImageUrls[index];
+
+          // Add a new page if there's not enough space
+          if (doc.y > 600) {
+            doc.addPage();
           }
+          
+          doc.fontSize(12).font('Helvetica-Bold').text(`Image ${index + 1}`, { underline: true });
+          doc.moveDown();
+
+          // Draw original image
+          const originalImagePath = path.join(__dirname, '..', imageUrl);
+          if (fs.existsSync(originalImagePath)) {
+            doc.image(originalImagePath, startX, doc.y, { width: imageWidth });
+          }
+
+          // Draw annotated image side-by-side
+          if (annotatedUrl) {
+            const annotatedImagePath = path.join(__dirname, '..', annotatedUrl);
+            if (fs.existsSync(annotatedImagePath)) {
+              doc.image(annotatedImagePath, startX + imageWidth + 20, doc.y, { width: imageWidth });
+            }
+          }
+          doc.moveDown(15); // Adjust spacing after images
+        });
+        
+        doc.addPage(); // New page for notes
+
+        // --- Notes ---
+        if (submission.note) {
+          doc.fontSize(14).font('Helvetica-Bold').text('Patient Notes');
+          doc.fontSize(12).font('Helvetica').text(submission.note, { width: 500 });
+          doc.moveDown(2);
         }
-        
-        currentY += 170;
-        
+
         if (submission.adminNotes) {
-          doc.fontSize(14).font('Helvetica-Bold').text('Professional Analysis', 50, currentY);
-          doc.fontSize(12).font('Helvetica').text(submission.adminNotes, 50, currentY + 20, { width: 500 });
-          currentY += 100;
+          doc.fontSize(14).font('Helvetica-Bold').text('Professional Analysis');
+          doc.fontSize(12).font('Helvetica').text(submission.adminNotes, { width: 500 });
         }
-        
-        doc.fontSize(14).font('Helvetica-Bold').text('Report Status', 50, currentY);
-        doc.fontSize(12).font('Helvetica').text(`Status: ${submission.status.toUpperCase()}`, 50, currentY + 20);
-        
-        doc.fontSize(10).font('Helvetica').text(
-          'This report is generated by OralVis Healthcare System. For any queries, please contact our support team.',
-          50, doc.page.height - 100,
-          { width: 500, align: 'center' }
-        );
-        
+
         doc.end();
       } catch (error) {
         reject(error);

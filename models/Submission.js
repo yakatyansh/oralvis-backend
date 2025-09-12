@@ -22,11 +22,12 @@ const submissionSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  originalImageUrl: {
-    type: String,
+
+  originalImageUrls: {
+    type: [String],
     required: true
   },
-  annotatedImageUrl: String,
+  annotatedImageUrls: [String],
   annotationData: {
     type: mongoose.Schema.Types.Mixed,
     default: null

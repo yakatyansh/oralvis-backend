@@ -59,31 +59,34 @@ router.get('/submissions/:id', async (req, res) => {
 
 router.post('/submissions/:id/annotate', async (req, res) => {
   try {
-    const { annotationData, annotatedImageData, adminNotes } = req.body;
+    // Expect an array of base64 image strings
+    const { annotationData, annotatedImageDatas, adminNotes } = req.body;
     
     const submission = await Submission.findById(req.params.id);
     if (!submission) {
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    let annotatedImageUrl;
-    if (annotatedImageData) {
-      const base64Data = annotatedImageData.replace(/^data:image\/\w+;base64,/, '');
-      const imageBuffer = Buffer.from(base64Data, 'base64');
-      
-      const processedBuffer = await sharp(imageBuffer)
-        .jpeg({ quality: 85 })
-        .toBuffer();
+    let annotatedImageUrls = [];
+    if (annotatedImageDatas && Array.isArray(annotatedImageDatas)) {
+      for (const imageData of annotatedImageDatas) {
+        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        
+        const processedBuffer = await sharp(imageBuffer)
+          .jpeg({ quality: 85 })
+          .toBuffer();
 
-      const timestamp = Date.now();
-      const filename = `annotated-${submission.patientId}-${timestamp}.jpg`;
-      const filePath = path.join('uploads', filename);
-      fs.writeFileSync(filePath, processedBuffer);
-      annotatedImageUrl = `/uploads/${filename}`;
+        const timestamp = Date.now();
+        const filename = `annotated-${submission.patientId}-${timestamp}-${Math.round(Math.random() * 1E3)}.jpg`;
+        const filePath = path.join('uploads', filename);
+        fs.writeFileSync(filePath, processedBuffer);
+        annotatedImageUrls.push(`/uploads/${filename}`);
+      }
     }
 
     submission.annotationData = annotationData;
-    submission.annotatedImageUrl = annotatedImageUrl;
+    submission.annotatedImageUrls = annotatedImageUrls; // Save the array
     submission.adminNotes = adminNotes || '';
     submission.status = 'annotated';
     submission.processedBy = req.user._id;
@@ -95,7 +98,7 @@ router.post('/submissions/:id/annotate', async (req, res) => {
       submission: {
         id: submission._id,
         status: submission.status,
-        annotatedImageUrl: submission.annotatedImageUrl
+        annotatedImageUrls: submission.annotatedImageUrls
       }
     });
   } catch (error) {
@@ -104,40 +107,5 @@ router.post('/submissions/:id/annotate', async (req, res) => {
   }
 });
 
-router.post('/submissions/:id/generate-pdf', async (req, res) => {
-  try {
-    const submission = await Submission.findById(req.params.id)
-      .populate('patient', 'name email')
-      .populate('processedBy', 'name');
-
-    if (!submission) {
-      return res.status(404).json({ message: 'Submission not found' });
-    }
-
-    if (submission.status !== 'annotated') {
-      return res.status(400).json({ message: 'Submission must be annotated first' });
-    }
-
-    const pdfResult = await PDFGenerator.generateReport(submission);
-
-    submission.reportUrl = pdfResult.reportUrl;
-    submission.status = 'reported';
-
-    await submission.save();
-
-     res.json({
-      message: 'PDF report generated successfully',
-      reportUrl: pdfResult.reportUrl,
-      submission: {
-        id: submission._id,
-        status: submission.status,
-        reportUrl: submission.reportUrl
-      }
-    });
-  } catch (error) {
-    console.error('Generate PDF report error:', error);
-    res.status(500).json({ message: 'Error generating PDF report' });
-  }
-});
 
 module.exports = router;

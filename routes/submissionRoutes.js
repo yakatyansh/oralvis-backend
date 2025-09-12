@@ -5,10 +5,10 @@ const { upload } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
-router.post('/upload', auth, upload.single('image'), async (req, res) => {
+router.post('/upload', auth, upload.array('images', 3), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image file uploaded' });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: 'No image files uploaded' });
     }
 
     const { patientName, patientId, email, note } = req.body;
@@ -17,7 +17,8 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    // Map over the files array to get an array of their paths
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
 
     const submission = new Submission({
       patient: req.user._id,
@@ -25,7 +26,7 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
       patientId,
       email,
       note: note || '',
-      originalImageUrl: imageUrl,
+      originalImageUrls: imageUrls, 
       status: 'uploaded'
     });
 
@@ -36,10 +37,8 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
       submission: {
         id: submission._id,
         patientName: submission.patientName,
-        patientId: submission.patientId,
         status: submission.status,
-        createdAt: submission.createdAt,
-        originalImageUrl: submission.originalImageUrl
+        originalImageUrls: submission.originalImageUrls
       }
     });
   } catch (error) {
@@ -48,6 +47,7 @@ router.post('/upload', auth, upload.single('image'), async (req, res) => {
   }
 });
 
+// ... (the rest of the routes remain the same)
 router.get('/my-submissions', auth, async (req, res) => {
   try {
     const submissions = await Submission.find({ patient: req.user._id })
@@ -83,5 +83,6 @@ router.get('/:id/report', auth, async (req, res) => {
     res.status(500).json({ message: 'Error downloading report' });
   }
 });
+
 
 module.exports = router;
