@@ -96,7 +96,6 @@ class PDFGenerator {
         
         doc.y = imageSectionY + 145;
 
-        // ... (rest of the file remains the same) ...
 
         const uniqueAnnotationTypes = [...new Set((submission.annotationData || []).flat().map((a) => a.type))];
         if (uniqueAnnotationTypes.length > 0) {
